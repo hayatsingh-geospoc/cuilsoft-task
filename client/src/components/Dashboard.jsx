@@ -11,81 +11,87 @@ const Dashboard = () => {
     const [error, setError] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
 
-    const refreshAggregatedData = useCallback(async () => {
-        try {
-            const data = await apiService.getAggregatedData();
-            setAggregatedData(data);
-        } catch (error) {
-            console.error('Error refreshing aggregated data:', error);
-        }
-    }, []);
-
-    const handleNewEvent = useCallback((event) => {
-        setRealTimeEvents(prev => {
-            const newEvents = [event, ...prev].slice(0, 10);
-            return newEvents;
-        });
-        refreshAggregatedData();
-    }, [refreshAggregatedData]);
-
     const loadInitialData = useCallback(async () => {
         try {
             setLoading(true);
-            const events = await apiService.getEvents({ limit: 10 });
-            setRealTimeEvents(events.data || []);
-            
-            const aggregated = await apiService.getAggregatedData();
-            setAggregatedData(aggregated);
             setError(null);
+
+            // Create some initial test events if needed
+            await createTestEvents();
+
+            const eventsResponse = await apiService.getEvents({ limit: 10 });
+            console.log('Loaded events:', eventsResponse);
+            setRealTimeEvents(eventsResponse.data || []);
+            
+            const aggregatedResponse = await apiService.getAggregatedData();
+            console.log('Loaded aggregated data:', aggregatedResponse);
+            setAggregatedData(aggregatedResponse);
+
         } catch (error) {
             console.error('Error loading initial data:', error);
-            setError('Failed to load dashboard data');
+            setError('Failed to load dashboard data. Please try again.');
         } finally {
             setLoading(false);
         }
     }, []);
 
+    // Function to create test events
+    const createTestEvents = async () => {
+        try {
+            const testEvents = [
+                {
+                    eventType: 'page_view',
+                    userId: 'user123',
+                    metadata: { page: '/home', browser: 'Chrome' }
+                },
+                {
+                    eventType: 'button_click',
+                    userId: 'user456',
+                    metadata: { buttonId: 'submit', location: 'header' }
+                }
+            ];
+
+            for (const event of testEvents) {
+                await apiService.createEvent(event);
+            }
+        } catch (error) {
+            console.error('Error creating test events:', error);
+        }
+    };
+
     useEffect(() => {
         // Setup WebSocket connection
         socketService.connect();
         
-        // Add connection status listeners
         socketService.onConnect(() => {
+            console.log('WebSocket connected');
             setIsConnected(true);
             loadInitialData();
         });
 
         socketService.onDisconnect(() => {
+            console.log('WebSocket disconnected');
             setIsConnected(false);
         });
 
-        // Subscribe to events
-        socketService.subscribeToEvents(handleNewEvent);
+        // Subscribe to real-time events
+        socketService.subscribeToEvents((event) => {
+            console.log('Received new event:', event);
+            setRealTimeEvents(prev => [event, ...prev].slice(0, 10));
+        });
 
         // Load initial data
         loadInitialData();
 
-        // Cleanup function
         return () => {
             socketService.disconnect();
         };
-    }, [handleNewEvent, loadInitialData]);
-
-    // Add periodic data refresh
-    useEffect(() => {
-        const refreshInterval = setInterval(() => {
-            if (isConnected) {
-                refreshAggregatedData();
-            }
-        }, 30000); // Refresh every 30 seconds
-
-        return () => clearInterval(refreshInterval);
-    }, [isConnected, refreshAggregatedData]);
+    }, [loadInitialData]);
 
     if (loading) {
         return (
             <div className="loading-container">
-                <h2>Loading dashboard...</h2>
+                <h2>Loading dashboard data...</h2>
             </div>
         );
     }
@@ -95,11 +101,8 @@ const Dashboard = () => {
             <div className="error-container">
                 <h2>Error</h2>
                 <p>{error}</p>
-                <button 
-                    className="retry-btn" 
-                    onClick={loadInitialData}
-                >
-                    Retry
+                <button className="retry-btn" onClick={loadInitialData}>
+                    Retry Loading
                 </button>
             </div>
         );

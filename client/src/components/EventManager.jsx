@@ -29,6 +29,20 @@ const EventManager = () => {
         }
     };
 
+    // Add this function to create a test event
+    const createTestEvent = () => {
+        const testEvent = {
+            eventType: 'test_event',
+            userId: `user_${Math.floor(Math.random() * 1000)}`,
+            metadata: {
+                timestamp: new Date().toISOString(),
+                testValue: Math.random()
+            }
+        };
+        
+        handleSubmit(testEvent);
+    };
+
     return (
         <div className="event-manager">
             <h2>Create New Event</h2>
@@ -67,6 +81,13 @@ const EventManager = () => {
                     />
                 </div>
                 <button type="submit" className="submit-btn" disabled={loading}>Create Event</button>
+                <button 
+                    type="button" 
+                    className="test-btn" 
+                    onClick={createTestEvent}
+                >
+                    Create Test Event
+                </button>
             </form>
         </div>
     );
